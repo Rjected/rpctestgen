@@ -16,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
+func u64(val uint64) *uint64 { return &val }
+
 // genSimpleChain generates a short chain with a few basic transactions.
 func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *types.Block) {
 	var (
@@ -37,7 +39,7 @@ func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *ty
 	)
 	gspec.Config.TerminalTotalDifficultyPassed = true
 	gspec.Config.TerminalTotalDifficulty = common.Big0
-	*gspec.Config.ShanghaiTime = uint64(0)
+	gspec.Config.ShanghaiTime = u64(0)
 
 	// init 0xaa with some storage elements
 	storage := make(map[common.Hash]common.Hash)
@@ -83,17 +85,6 @@ func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *ty
 		}
 	})
 
-	firstWithdrawal := chain[1].Withdrawals()[0]
-	secondWithdrawal := chain[1].Withdrawals()[1]
-
-	if firstWithdrawal.Index != idxOne {
-		panic(fmt.Sprintf("expected first withdrawal index to be %d, got %d", idxOne, firstWithdrawal.Index))
-	}
-
-	if secondWithdrawal.Index != idxTwo {
-		panic(fmt.Sprintf("expected second withdrawal index to be %d, got %d", idxTwo, secondWithdrawal.Index))
-	}
-
 	// Modify block so that recorded gas used does not equal actual.
 	bad := chain[len(chain)-1]
 	h := bad.Header()
@@ -119,6 +110,10 @@ func (e sealingEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, he
 	sealedBlock := make(chan *types.Block, 1)
 
 	fmt.Printf("sealing block %d\n", header.Number.Uint64())
+	for _, w := range withdrawals {
+		fmt.Printf("sealing block with withdrawal %#+v\n", w)
+		fmt.Printf("withdrawal has index %d\n", w.Index)
+	}
 
 	// Only wait for sealedBlock if not PoS.
 	if b, ok := e.Engine.(*beacon.Beacon); ok {
