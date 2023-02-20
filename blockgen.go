@@ -37,7 +37,7 @@ func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *ty
 	)
 	gspec.Config.TerminalTotalDifficultyPassed = true
 	gspec.Config.TerminalTotalDifficulty = common.Big0
-	gspec.Config.ShanghaiTime = common.Big0
+	*gspec.Config.ShanghaiTime = uint64(0)
 
 	// init 0xaa with some storage elements
 	storage := make(map[common.Hash]common.Hash)
@@ -60,25 +60,39 @@ func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *ty
 
 	genesis := gspec.MustCommit(gendb)
 
+	idxOne := uint64(123)
+	idxTwo := uint64(124)
+
 	sealingEngine := sealingEngine{engine}
 	chain, _ := core.GenerateChain(gspec.Config, genesis, sealingEngine, gendb, 4, func(i int, gen *core.BlockGen) {
 		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(address), address, big.NewInt(1000), params.TxGas, new(big.Int).Add(gen.BaseFee(), common.Big1), nil), signer, key)
 		gen.AddTx(tx)
 		if i == 1 {
 			gen.AddWithdrawal(&types.Withdrawal{
-				Index:     123,
+				Index:     idxOne,
 				Validator: 42,
 				Address:   common.Address{0xee},
-				Amount:    big.NewInt(1337),
+				Amount:    1337,
 			})
 			gen.AddWithdrawal(&types.Withdrawal{
-				Index:     124,
+				Index:     idxTwo,
 				Validator: 13,
 				Address:   common.Address{0xee},
-				Amount:    big.NewInt(1),
+				Amount:    1,
 			})
 		}
 	})
+
+	firstWithdrawal := chain[1].Withdrawals()[0]
+	secondWithdrawal := chain[1].Withdrawals()[1]
+
+	if firstWithdrawal.Index != idxOne {
+		panic(fmt.Sprintf("expected first withdrawal index to be %d, got %d", idxOne, firstWithdrawal.Index))
+	}
+
+	if secondWithdrawal.Index != idxTwo {
+		panic(fmt.Sprintf("expected second withdrawal index to be %d, got %d", idxTwo, secondWithdrawal.Index))
+	}
 
 	// Modify block so that recorded gas used does not equal actual.
 	bad := chain[len(chain)-1]
@@ -109,7 +123,7 @@ func (e sealingEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, he
 	// Only wait for sealedBlock if not PoS.
 	if b, ok := e.Engine.(*beacon.Beacon); ok {
 		if b.IsPoSHeader(header) {
-			return types.NewBlock2(header, txs, uncles, receipts, withdrawals, trie.NewStackTrie(nil)), nil
+			return types.NewBlockWithWithdrawals(header, txs, uncles, receipts, withdrawals, trie.NewStackTrie(nil)), nil
 		}
 	}
 	if err = e.Engine.Seal(nil, block, sealedBlock, nil); err != nil {
