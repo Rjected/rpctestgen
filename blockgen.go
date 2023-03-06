@@ -66,6 +66,7 @@ func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *ty
 	chain, _ := core.GenerateChain(gspec.Config, genesis, sealingEngine, gendb, 4, func(i int, gen *core.BlockGen) {
 		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(address), address, big.NewInt(1000), params.TxGas, new(big.Int).Add(gen.BaseFee(), common.Big1), nil), signer, key)
 		gen.AddTx(tx)
+		gen.SetDifficulty(common.Big0)
 		if i == 1 {
 			gen.AddWithdrawal(&types.Withdrawal{
 				Index:     123,
@@ -111,9 +112,14 @@ func (e sealingEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, he
 	// Only wait for sealedBlock if not PoS.
 	if b, ok := e.Engine.(*beacon.Beacon); ok {
 		if b.IsPoSHeader(header) {
+			// enforce that withdrawals is never nil
+			if withdrawals == nil {
+				withdrawals = []*types.Withdrawal{}
+			}
 			return types.NewBlockWithWithdrawals(header, txs, uncles, receipts, withdrawals, trie.NewStackTrie(nil)), nil
 		}
 	}
+
 	if err = e.Engine.Seal(nil, block, sealedBlock, nil); err != nil {
 		return nil, err
 	}
