@@ -61,6 +61,7 @@ func genSimpleChain(engine consensus.Engine) (*core.Genesis, []*types.Block, *ty
 	}
 
 	genesis := gspec.MustCommit(gendb)
+	genesis.WithWithdrawals([]*types.Withdrawal{})
 
 	sealingEngine := sealingEngine{engine}
 	chain, _ := core.GenerateChain(gspec.Config, genesis, sealingEngine, gendb, 4, func(i int, gen *core.BlockGen) {
